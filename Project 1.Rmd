@@ -1,0 +1,32 @@
+---
+title: "Project 1"
+author: "Melody"
+date: "2022-09-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r setup}
+install.packages("tidytuesdayR")
+library(tidytuesdayR)
+
+library(here)
+library(tidyverse)
+
+tuesdata <- tidytuesdayR::tt_load('2022-01-18')
+chocolate <- tuesdata$chocolate
+as_tibble(chocolate)
+glimpse(chocolate)
+
+```
+
+#### Part 1: Exploring Data
+
+1.  Make a histogram of the rating scores to visualize overall distribution of scores, change the bins, pick the one you like best, and explain the difference among the bins and why you chose the one you did.
+
+```{r histograms}
+
+```
