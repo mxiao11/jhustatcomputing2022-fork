@@ -1,6 +1,6 @@
 # Statistical Computing
 
-This repo is for the Johns Hopkins BSPH course titled 'Statistical Computing' (BSPH 140.776.01) in Fall 2022.
+This repo is XIAO's copy of the original repo for the Johns Hopkins BSPH course titled 'Statistical Computing' (BSPH 140.776.01) in Fall 2022.
 
 ## Instructor
 
