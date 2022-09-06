@@ -10,16 +10,15 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r setup}
-install.packages("tidytuesdayR")
+# install.packages("tidytuesdayR")
 library(tidytuesdayR)
 
 library(here)
 library(tidyverse)
+library(ggplot2)
 
-tuesdata <- tidytuesdayR::tt_load('2022-01-18')
-chocolate <- tuesdata$chocolate
+chocolate <- readRDS(here("data","chocolate.RDS"))
 as_tibble(chocolate)
-glimpse(chocolate)
 
 ```
 
@@ -28,5 +27,25 @@ glimpse(chocolate)
 1.  Make a histogram of the rating scores to visualize overall distribution of scores, change the bins, pick the one you like best, and explain the difference among the bins and why you chose the one you did.
 
 ```{r histograms}
+## default (30 bins)
+ggplot(data=chocolate, aes(x=rating)) +
+  geom_histogram(color="lightblue", fill="lightblue")
+
+## 10 bins
+ggplot(data=chocolate, aes(x=rating)) +
+  geom_histogram(bins=10, color="salmon", fill="salmon")
+
+## 15 bins
+ggplot(data=chocolate, aes(x=rating)) +
+  geom_histogram(bins=15, color="red", fill="red")
+
+## 20 bins
+ggplot(data=chocolate, aes(x=rating)) +
+  geom_histogram(bins=20, color="lightpink", fill="lightpink")
+
+## 25 bins
+ggplot(data=chocolate, aes(x=rating)) +
+  geom_histogram(bins=25, color="deeppink", fill="deeppink")
 
 ```
+> I personally like the histogram with 15 bins (colored red) because it doesn't feel as disjointed as the histograms with more bins and so is visually nicer.
