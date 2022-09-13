@@ -9,9 +9,9 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r setup, include=FALSE}
+```{r more setup, include=FALSE}
 library(pacman)
-p_load(ggplot2, tidyverse, here, tidytuesdayR, gapminder)
+p_load(ggplot2, tidyverse, here, tidytuesdayR, gapminder, stringr, magrittr)
 
 chocolate <- readRDS(here("data","chocolate.RDS"))
 as_tibble(chocolate)
@@ -48,11 +48,11 @@ ggplot(data=chocolate, aes(x=rating)) +
 
 > I personally like the histogram with 15 bins (colored red) because it doesn't feel as disjointed as the histograms with more bins and so is visually nicer.
 
-2.  How many reviews come from each country of bean origin? (WHAT IS THIS ASKING?)
+2.  How many reviews come from each country of bean origin?
 
 ```{r beans}
-table(chocolate$country_of_bean_origin)
-# is this asking how many  
+print(table(chocolate$country_of_bean_origin))
+# is this asking how many?
 
 ```
 
@@ -162,21 +162,230 @@ ggplot(data=d, aes(x=percent, y=rating)) +
 
 ```
 
-> Of the four cocoa percentage categories, the two percentage categories that appear to be the most popular are 60%-70% and 70%-90%. This is not a consistent observation across the included countries, but most countries' most popular chocolate category is one of the two.
+> Of the four cocoa percentage categories, the two percentage categories that appear to be the most popular on average are 60%-70% and 70%-90%. This is not a consistent observation across the included countries, but most countries' most popular chocolate category is one of the two.
 
 
 #### Part 2: Join two datasets together
 ```{r joining}
-ch <- data.frame(table(chocolate$country_of_bean_origin))
-ch <- ch %>%
+## prep
+y <- data.frame(table(chocolate$country_of_bean_origin))
+y <- y %>%
   rename(country_of_bean_origin = Var1)
 
-e <- left_join(chocolate, ch, by="country_of_bean_origin")
+e <- left_join(chocolate, y, by="country_of_bean_origin")
 e <- e %>%
   filter(Freq>=10) %>%
-  filter(!(country_of_bean_origin=="Blend"))
+  filter(!(country_of_bean_origin=="Blend")) %>%
+  rename(country=country_of_bean_origin)
+table(e$country_of_bean_origin)
+
+z <- gapminder %>%
+  pivot_longer(-c(country:year), names_to="stats", values_to="value") %>%
+  mutate(country=recode(country, "United States"="U.S.A.")) %>%
+  mutate(country=recode(country, "Congo, Dem. Rep."="Congo")) %>%
+  select(country, continent)
+
+## filling in the later NAs
+## countries with NA continents: Belize (Americas), Congo (Africa), St. Lucia (Americas), Fiji (Oceania), Grenada (Americas), Papua New Guinea (Oceania), Sao Tome (Africa), Solomon Islands (Oceania), Trinidad (Americas), Vanuatu (Oceania)
+country <- c("Belize", "St. Lucia","Fiji","Grenada","Papua New Guinea","Sao Tome","Solomon Islands","Trinidad","Vanuatu")
+continent <- c("Americas", "Americas","Oceania","Americas","Oceania","Africa","Oceania",
+               "Americas","Oceania")
+df <- data.frame(country, continent)
+v <- rbind(z, df)
+
+table(v$country)
+
+## joining and checking
+x <- left_join(e, v, by="country")
+table(x$country)
+table(x$continent)
+
+## violin plot
+ggplot(data=x, aes(x=continent, y=rating)) +
+  geom_violin(color="darkseagreen", fill="darkseagreen3") +
+  geom_boxplot(width=0.1) +
+  theme_minimal() +
+  labs(title="Distribution of Chocolate Ratings per Continent", x="Rating (out of 4)",
+       y="Continent", caption="Europe was not the source of any beans so was excluded")
 
 ```
+
+
+#### Part 3: Wide to long data
+```{r wide to long}
+table(chocolate$ingredients)
+
+## new set of columns part 1
+f <- chocolate %>%
+  mutate(beans=1) %>%
+  mutate(sugar=ifelse(ingredients=="2- B,S" | ingredients=="3- B,S,C" | ingredients=="3- B,S,L" |
+                        ingredients=="3- B,S,V" | ingredients=="4- B,S,C,L" | 
+                        ingredients=="4- B,S,C,Sa" | ingredients=="4- B,S,C,V" |
+                        ingredients=="4- B,S,V,L" | ingredients=="5- B,S,C,L,Sa" |
+                        ingredients=="5- B,S,C,V,L" | ingredients=="5-B,S,C,V,Sa" |
+                        ingredients=="6-B,S,C,V,L,Sa", 
+                      1, 0)) %>%
+  mutate(cocoa_butter=ifelse(ingredients=="2- B,C" | ingredients=="3- B,S*,C" | 
+                               ingredients=="3- B,S,C" | ingredients=="4- B,S*,C,L" |
+                               ingredients=="4- B,S*,C,Sa" | ingredients=="4- B,S*,C,V" |
+                               ingredients=="4- B,S,C,L" | ingredients=="4- B,S,C,Sa" |
+                               ingredients=="4- B,S,C,V" | ingredients=="4- B,S,V,L" |
+                               ingredients=="5- B,S,C,L,Sa" | ingredients=="5- B,S,C,V,L" |
+                               ingredients=="5-B,S,C,V,Sa" | ingredients=="6-B,S,C,V,L,Sa", 
+                             1, 0)) %>%
+  mutate(vanilla=ifelse(ingredients=="3- B,S,V" | ingredients=="4- B,S*,C,V" | 
+                          ingredients=="4- B,S*,V,L" | ingredients=="4- B,S,C,V" | 
+                          ingredients=="4- B,S,V,L" | ingredients=="5- B,S,C,V,L" |
+                          ingredients=="5-B,S,C,V,Sa" | ingredients=="6-B,S,C,V,L,Sa",
+                        1, 0)) %>%
+  mutate(letchin=ifelse(ingredients=="3- B,S,L" | ingredients=="4- B,S*,C,L" |
+                          ingredients=="4- B,S*,V,L" | ingredients=="4- B,S,C,L" |
+                          ingredients=="4- B,S,V,L" | ingredients=="5- B,S,C,L,Sa" |
+                          ingredients=="5- B,S,C,V,L" | ingredients=="6-B,S,C,V,L,Sa",
+                        1, 0)) %>%
+  mutate(salt=ifelse(ingredients=="3- B,S*,Sa" | ingredients=="4- B,S*,C,Sa" | 
+                       ingredients=="4- B,S,C,Sa" | ingredients=="5- B,S,C,L,Sa" |
+                       ingredients=="5-B,S,C,V,Sa" | ingredients=="6-B,S,C,V,L,Sa",
+                     1, 0))
+
+## new set of columns part 2
+f$char_cocoa <- str_detect(f$most_memorable_characteristics, "cocoa")
+f %<>% mutate(char_cocoa=ifelse(char_cocoa=="TRUE",1,0))
+f$char_sweet <- str_detect(f$most_memorable_characteristics, "sweet")
+f %<>% mutate(char_sweet=ifelse(char_sweet=="TRUE",1,0))
+f$char_nutty <- str_detect(f$most_memorable_characteristics, "nutty")
+f %<>% mutate(char_nutty=ifelse(char_nutty=="TRUE",1,0))
+f$char_creamy <- str_detect(f$most_memorable_characteristics, "creamy")
+f %<>% mutate(char_creamy=ifelse(char_creamy=="TRUE",1,0))
+f$char_roasty <- str_detect(f$most_memorable_characteristics, "roasty")
+f %<>% mutate(char_roasty=ifelse(char_roasty=="TRUE",1,0))
+f$char_earthy <- str_detect(f$most_memorable_characteristics, "earthy")
+f %<>% mutate(char_earthy=ifelse(char_earthy=="TRUE",1,0))
+
+## mean value across all reviews per year
+g <- f %>%
+  select(review_date, beans, sugar, cocoa_butter, vanilla, letchin, salt, char_cocoa, char_sweet,
+         char_nutty, char_creamy, char_roasty, char_earthy) %>%
+  group_by(review_date) %>%
+  mutate(beans_mean=mean(beans)) %>%
+  mutate(sugar_mean=mean(sugar)) %>%
+  mutate(cocoa_butter_mean=mean(cocoa_butter)) %>%
+  mutate(vanilla_mean=mean(vanilla)) %>%
+  mutate(letchin_mean=mean(letchin)) %>%
+  mutate(salt_mean=mean(salt)) %>%
+  mutate(char_cocoa_mean=mean(char_cocoa)) %>%
+  mutate(char_sweet_mean=mean(char_sweet)) %>%
+  mutate(char_nutty_mean=mean(char_nutty)) %>%
+  mutate(char_creamy_mean=mean(char_creamy)) %>%
+  mutate(char_roasty_mean=mean(char_roasty)) %>%
+  mutate(char_earthy_mean=mean(char_earthy))
+g <- g %>%
+  select(review_date, beans_mean, sugar_mean, cocoa_butter_mean, vanilla_mean, letchin_mean,
+         salt_mean, char_cocoa_mean, char_sweet_mean, char_nutty_mean, char_creamy_mean,
+         char_roasty_mean, char_earthy_mean) %>%
+  rename(beans=beans_mean,
+         sugar=sugar_mean,
+         cocoa_butter=cocoa_butter_mean,
+         vanilla=vanilla_mean,
+         letchin=letchin_mean,
+         salt=salt_mean,
+         char_cocoa=char_cocoa_mean,
+         char_sweet=char_sweet_mean,
+         char_nutty=char_nutty_mean,
+         char_creamy=char_creamy_mean,
+         char_roasty=char_roasty_mean,
+         char_earthy=char_earthy_mean)
+
+h <- g %>%
+  pivot_longer(-review_date, names_to="feature", values_to="mean_scores") %>%
+  distinct(review_date, feature, mean_scores)
+print(h)
+
+```
+
+```{r alternative method of making new part 1 columns, include=FALSE}
+fiwb <- chocolate %>%
+  mutate(beans=case_when(grepl(pattern="B", x=ingredients)~"1",
+                         TRUE~"0")) %>%
+  mutate(sugar=case_when(grepl(pattern="S", x=ingredients)~"1",
+                         TRUE~"0")) %>%
+  mutate(cocoa_butter=case_when(grepl(pattern="C", x=ingredients)~"1",
+                                TRUE~"0")) %>%
+  mutate(vanilla=case_when(grepl(pattern="V", x=ingredients)~"1",
+                           TRUE~"0")) %>%
+  mutate(letchin=case_when(grepl(pattern="L", x=ingredients)~"1",
+                           TRUE~"0")) %>%
+  mutate(salt=case_when(grepl(pattern="Sa", x=ingredients)~"1",
+                        TRUE~"0"))
+
+```
+
+
+
+#### Part 4: Data visualization
+```{r data vis}
+i <- ggplot(data=h, aes(review_date, mean_scores)) +
+  geom_point() +
+  geom_smooth(method="loess", se=FALSE, color="salmon") +
+  facet_wrap(~feature) +
+  theme_minimal() +
+  labs(x="Year of review", y="Average score (out of 1)", 
+       title="Change in average characteristic score over time", 
+       subtitle="Average characteristic scores for chocolate generally stay constant with time",
+       caption="Mel Xiao")
+i
+
+```
+
+
+#### Part 5: Worst plot
+```{r ugly plot}
+j <- ggplot(data=chocolate, aes(x=review_date, y=ref)) +
+  geom_line() +
+  geom_path(lineend="butt",linejoin="round",linemitre=1, color="limegreen") +
+  ylim(-5,80000) +
+  labs(title="Title3", x="yeaR", y="amount", caption="please give me an A")
+j
+
+```
+
+> 1. The y-axis is the reference number for each chocolate review, which is a wildly uninformative thing to plot over time (it does not change over time). 
+> 2. Geom_path normally connects the pieces of data as they appear in the data. Here, the path is a disaster and we cannot see where it connects to or from anything.
+> 3. The path is also lime green because in R, the color "limegreen" does not look great. The color is also not informative for anything (like grouping).
+> 4. The y axis is scaled way too far out and we can't see any of the information that we actually have.
+> 5. The title tells us nothing about the data we are looking at or what the graph is trying to depict.
+> 6. The x and y axis labels also don't tell us about what units we are working with or even what the axes represent; for example, what does "amount" mean? And "year" is spelled weirdly.
+> 7. The caption asks for you to give me an A, which does not relate to the assignment or the results and can probably be considered pandering. 
+>
+> When I am trying to make an actually good graph (respective to the above customizations):
+> 1. I will look for a y-axis that actually changes over time, if my x-axis is time, so that the results actually make sense and I can track changes.
+> 2. I won't add extra geoms that I don't need, and if I ever do need geom_path I will use it with data where it makes sense to track the order in which data appears.
+> 3. I will use color more intelligently, such as to distinguish between groups; I will also use more visually appealing colors.
+> 4. My y-axis can and will be scaled properly so that all the data is encompassed but is not so far out that the data is hard to see.
+> 5. I will give my plot a coherent and useful title that tells me what the graph is actually of.
+> 6. X and Y axis labels should tell me what the axis is representing and in what units.
+> 7. The caption should be used for something useful, like my name or extra explanations.
+
+
+#### Part 6: Better plot
+```{r better plot}
+k <- ggplot(data=chocolate, aes(x=review_date, y=rating, group=review_date)) +
+  geom_boxplot() +
+  labs(title="Distribution of chocolate scores across all countries and over time",
+         x="Year of Review", y="Rating (out of 4)") +
+  theme_minimal()
+k
+
+```
+
+> 1. I removed the fill. Originally, having the fill was meant to show a gradient from earlier to later dates, but the fill was not actually informative; we can tell from the x-axis that we are looking at changes over time.
+> 2. I changed the x-axis label to "Year of Review," which is a more informative and useful thing to name the x-axis.
+> 3. I changed the y-axis label to "Score (out of 4)" so that we know what the ratings actually mean and what the scale of it is.
+> 4. I added a title to the graph so we know what it is about.
+> 5. I changed the geom to geom_boxplot because it is more informative than a violin plot in showing distribution data.
+> 6. I left the year of review as a numeric variable because it is inherently a numeric piece of data that increases/has an ordering. 
+> 7. I changed the theme to minimal so that the boxplots are more easily visible, especially the outliers.
+
 
 
 
